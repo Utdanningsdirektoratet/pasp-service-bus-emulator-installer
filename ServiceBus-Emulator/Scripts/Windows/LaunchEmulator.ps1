@@ -1,6 +1,6 @@
 param(
   [string]$ACCEPT_EULA='n',
-  [string]$CONFIG_PATH='../ServiceBus-Emulator/Config/Config.json',
+  [string]$CONFIG_PATH='../ServiceBus-Emulator/Config/Gds/Config.json',
   [string]$SQL_PASSWORD=''
 )
 
@@ -11,7 +11,7 @@ Write-Warning "As running native .ps1 script required updating your machine's ex
 
 # For dynamic ports and support communication to host network use the commented docker compose file path instead.
 # composeFile=$(realpath "$(dirname "$BASH_SOURCE")/../../../Docker-Compose-Template/docker-compose-custom-ports-windows-mac.yaml")
-$composeFile = Join-Path $PSScriptRoot "/../../../Docker-Compose-Template/docker-compose-default.yml"
+$composeFile = Join-Path $PSScriptRoot "/../../../Docker-Compose-Template/docker-compose-standalone-emulator.yml"
 
 if ($PSBoundParameters.ContainsKey('ACCEPT_EULA')) {
     if ($ACCEPT_EULA -ne 'y' -and $ACCEPT_EULA -ne 'Y') {

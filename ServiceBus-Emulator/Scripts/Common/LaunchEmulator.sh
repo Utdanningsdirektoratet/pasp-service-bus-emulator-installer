@@ -2,9 +2,9 @@
 
 # Initialize variables
 ACCEPT_EULA='n'
-CONFIG_PATH='../ServiceBus-Emulator/Config/Config.json'
+CONFIG_PATH='../ServiceBus-Emulator/Config/Gds/Config.json'
 COMPOSE_DOWN='n'
-composeFile=$(realpath "$(dirname "$BASH_SOURCE")/../../../Docker-Compose-Template/docker-compose-default.yml")
+composeFile=$(realpath "$(dirname "$BASH_SOURCE")/../../../Docker-Compose-Template/docker-compose-standalone-emulator.yml")
 SQL_PASSWORD=''
 SQL_WAIT_INTERVAL=''
 
