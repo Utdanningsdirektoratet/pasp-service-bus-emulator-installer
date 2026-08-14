@@ -100,7 +100,7 @@ Once the steps are successful, Emulator compose set can be found running in Dock
 
 ## Interacting with the emulator
 
-By default, emulator uses [config.json](https://github.com/Azure/azure-service-bus-emulator-installer/blob/main/ServiceBus-Emulator/Config/Config.json) configuration file. You can configure entities by making changes to configuration file. To know more, visit [make configuration changes](https://learn.microsoft.com/en-us/azure/service-bus-messaging/overview-emulator#quota-configuration-changes). 
+By default, emulator uses [config.json](https://github.com/Utdanningsdirektoratet/pasp-service-bus-emulator-installer/blob/main/ServiceBus-Emulator/Config/Prover/Config.json) configuration file. You can configure entities by making changes to configuration file. To know more, visit [make configuration changes](https://learn.microsoft.com/en-us/azure/service-bus-messaging/overview-emulator#quota-configuration-changes). 
 
 >[!NOTE]
 > Service Bus emulator isn't compatible with the community owned [open source Service Bus Explorer](https://github.com/paolosalvatori/ServiceBusExplorer)
