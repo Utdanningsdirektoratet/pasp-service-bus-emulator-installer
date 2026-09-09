@@ -1,11 +1,13 @@
 ﻿using Azure.Messaging.ServiceBus;
 using ServiceBusExplorer.ApplicationHelpers;
+using ServiceBusExplorer.Models;
 
 namespace ServiceBusExplorer.AppConfiguration;
 
 public static class EndpointConfiguration
 {
     private const int MaxMessages = 100;
+    private const int MaxDeadLetterReasonLength = 4096;
 
     public static WebApplication ConfigureEndpoints(this WebApplication app)
     {
@@ -95,6 +97,111 @@ public static class EndpointConfiguration
             }
         );
 
+        // Sends a new message to the active queue.
+        app.MapPost(
+            "/api/active",
+            async (SendMessageRequest? sendRequest, HttpRequest request) =>
+            {
+                if (
+                    !ConfigHelper.TryGetConfig(
+                        request,
+                        out var connectionString,
+                        out var queueName,
+                        out var error
+                    )
+                )
+                {
+                    return Results.Problem(error);
+                }
+
+                if (string.IsNullOrWhiteSpace(sendRequest?.Body))
+                {
+                    return Results.BadRequest(new { message = "Message body is required." });
+                }
+
+                await using var client = new ServiceBusClient(connectionString);
+
+                return await ServiceBusHelper.SendAsync(client, queueName, sendRequest);
+            }
+        );
+
+        // Explicitly moves an active message to the dead-letter queue.
+        app.MapPost(
+            "/api/active/{sequenceNumber:long}/deadletter",
+            async (long sequenceNumber, DeadLetterRequest? deadLetterRequest, HttpRequest request) =>
+            {
+                if (
+                    !ConfigHelper.TryGetConfig(
+                        request,
+                        out var connectionString,
+                        out var queueName,
+                        out var error
+                    )
+                )
+                {
+                    return Results.Problem(error);
+                }
+
+                if (
+                    deadLetterRequest?.Reason?.Length > MaxDeadLetterReasonLength
+                    || deadLetterRequest?.Description?.Length > MaxDeadLetterReasonLength
+                )
+                {
+                    return Results.BadRequest(
+                        new
+                        {
+                            message = "Dead-letter reason/description exceeds the maximum length of 4096 characters.",
+                        }
+                    );
+                }
+
+                await using var client = new ServiceBusClient(connectionString);
+
+                try
+                {
+                    return await ServiceBusHelper.ProcessMessageAsync(
+                        client,
+                        queueName,
+                        SubQueue.None,
+                        sequenceNumber,
+                        (msg, receiver, _) =>
+                            receiver.DeadLetterMessageAsync(
+                                msg,
+                                deadLetterRequest?.Reason,
+                                deadLetterRequest?.Description
+                            )
+                    );
+                }
+                catch (ServiceBusException ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
+            }
+        );
+
+        // Deletes all active messages from the queue.
+        app.MapDelete(
+            "/api/active",
+            async (HttpRequest request) =>
+            {
+                if (
+                    !ConfigHelper.TryGetConfig(
+                        request,
+                        out var connectionString,
+                        out var queueName,
+                        out var error
+                    )
+                )
+                {
+                    return Results.Problem(error);
+                }
+
+                await using var client = new ServiceBusClient(connectionString);
+
+                return await ServiceBusHelper.PurgeAsync(client, queueName, SubQueue.None);
+            }
+        );
+
         // Deletes a single dead-letter message by sequence number.
         app.MapDelete(
             "/api/deadletter/{sequenceNumber:long}",
@@ -121,29 +228,6 @@ public static class EndpointConfiguration
                     sequenceNumber,
                     (msg, receiver, _) => receiver.CompleteMessageAsync(msg)
                 );
-            }
-        );
-
-        // Deletes all active messages from the queue.
-        app.MapDelete(
-            "/api/active",
-            async (HttpRequest request) =>
-            {
-                if (
-                    !ConfigHelper.TryGetConfig(
-                        request,
-                        out var connectionString,
-                        out var queueName,
-                        out var error
-                    )
-                )
-                {
-                    return Results.Problem(error);
-                }
-
-                await using var client = new ServiceBusClient(connectionString);
-
-                return await ServiceBusHelper.PurgeAsync(client, queueName, SubQueue.None);
             }
         );
 

@@ -7,6 +7,8 @@ namespace ServiceBusExplorer.ApplicationHelpers;
 public static class ServiceBusHelper
 {
     private const int MaxScan = 500;
+    private const string DefaultContentType = "application/json";
+    private const int MaxSubjectLength = 255;
 
     // Returns the true message counts for the queue (active and dead-letter) using the
     // management API, independent of how many messages are peeked for display.
@@ -62,6 +64,50 @@ public static class ServiceBusHelper
                 m.Body.ToString()
             )),
         ];
+    }
+
+    // Sends a new message to the queue, defaulting the content type to JSON when not supplied.
+    public static async Task<IResult> SendAsync(
+        ServiceBusClient client,
+        string queueName,
+        SendMessageRequest request
+    )
+    {
+        if (string.IsNullOrWhiteSpace(request.Body))
+        {
+            return Results.BadRequest(new { message = "Message body is required." });
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Subject) && request.Subject.Length > MaxSubjectLength)
+        {
+            return Results.BadRequest(
+                new { message = "Subject exceeds the maximum length of 255 characters." }
+            );
+        }
+
+        await using var sender = client.CreateSender(queueName);
+
+        var message = new ServiceBusMessage(request.Body);
+
+        if (!string.IsNullOrWhiteSpace(request.Subject))
+        {
+            message.Subject = request.Subject;
+        }
+
+        message.ContentType = string.IsNullOrWhiteSpace(request.ContentType)
+            ? DefaultContentType
+            : request.ContentType;
+
+        try
+        {
+            await sender.SendMessageAsync(message);
+        }
+        catch (ServiceBusException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
+
+        return Results.Ok(new { success = true });
     }
 
     // Deletes every message from the queue (or its dead-letter sub-queue) by receiving them in

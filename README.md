@@ -178,3 +178,11 @@ When the app opens you can either connect using Quick load buttons. It will the 
 
 #### Connect to live service bus 
 You can connect to live service bus in azure by copying SAS connection string from Azure portal then enter the queue name and click Save & connect.
+
+#### Managing messages
+Once connected to a queue you can inspect and manage its messages directly from the app:
+- **Add message**, compose and send a new message to the active queue. You can set an optional `Subject`, a `Content type` (defaults to `application/json`) and the message `Body`.
+- **Dead-letter**, move an active message to the dead-letter queue, optionally providing a reason.
+- **Resubmit**, send a dead-letter message back onto the active queue, removing it from the dead-letter queue.
+- **Delete**, delete a single message from either the active or the dead-letter queue.
+- **Delete all / Purge**, remove all messages from either the active or the dead-letter queue.

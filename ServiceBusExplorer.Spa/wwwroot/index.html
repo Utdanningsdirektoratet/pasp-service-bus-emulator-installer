@@ -454,6 +454,7 @@
             <option value="300000">5m</option>
         </select>
         <button class="refresh" id="connBtn" onclick="openSettings()" style="background:#fff;color:var(--text);border:1px solid var(--border);">Connection</button>
+        <button class="refresh" onclick="openCompose()">Add message</button>
         <button class="refresh" id="refreshBtn" onclick="load()">Refresh</button>
     </div>
 </header>
@@ -538,12 +539,41 @@
     </div>
 </div>
 
+<div class="overlay" id="composeOverlay" onclick="if(event.target===this)closeCompose()">
+    <div class="modal">
+        <div class="modal-head">
+            <h3>Add message</h3>
+            <button class="close" onclick="closeCompose()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="field">
+                <label for="composeSubject">Subject</label>
+                <input id="composeSubject" placeholder="Optional subject" spellcheck="false" type="text"/>
+            </div>
+            <div class="field">
+                <label for="composeContentType">Content type</label>
+                <input id="composeContentType" placeholder="application/json" spellcheck="false" type="text" value="application/json"/>
+            </div>
+            <div class="field">
+                <label for="composeBody">Body</label>
+                <textarea id="composeBody" placeholder="Message body" rows="8" spellcheck="false"></textarea>
+            </div>
+            <div class="error" id="composeError" style="display:none;text-align:left;padding:0;"></div>
+        </div>
+        <div class="modal-foot">
+            <button class="act" onclick="closeCompose()" type="button">Cancel</button>
+            <button class="act resubmit" onclick="sendMessage()" type="button">Send</button>
+        </div>
+    </div>
+</div>
+
 <script>
     let current = {active: [], deadLetter: []};
     let autoTimer = null;
     let busy = false;
 
     const STORE_KEY = "sbConnection";
+    const DEFAULT_CONTENT_TYPE = "application/json";
 
     function getSettings() {
         try {
@@ -641,6 +671,39 @@
         document.getElementById("deadCard").innerHTML = "";
     }
 
+    function openCompose() {
+        if (!hasSettings()) {
+            openSettings();
+            return;
+        }
+        document.getElementById("composeSubject").value = "";
+        document.getElementById("composeContentType").value = DEFAULT_CONTENT_TYPE;
+        document.getElementById("composeBody").value = "";
+        document.getElementById("composeError").style.display = "none";
+        document.getElementById("composeOverlay").classList.add("open");
+    }
+
+    function closeCompose() {
+        document.getElementById("composeOverlay").classList.remove("open");
+    }
+
+    async function sendMessage() {
+        const body = document.getElementById("composeBody").value.trim();
+        const subject = document.getElementById("composeSubject").value.trim();
+        const contentType = document.getElementById("composeContentType").value.trim();
+        const errEl = document.getElementById("composeError");
+        if (!body) {
+            errEl.textContent = "Message body is required.";
+            errEl.style.display = "block";
+            return;
+        }
+        if (await action("/api/active", "POST", "Message sent.", {
+            body,
+            subject: subject || null,
+            contentType: contentType || null
+        })) closeCompose();
+    }
+
     function updateQueueLabel() {
         const s = getSettings();
         document.getElementById("queueName").textContent = s && s.queue ? "Queue: " + s.queue : "Not connected";
@@ -678,7 +741,9 @@
           <td>${esc(m.deliveryCount)}</td>
           ${isDead ? `<td>${esc(m.deadLetterReason) || "&mdash;"}</td>` : ""}
           <td class="actions">
-            ${isDead ? `<button class="act resubmit" onclick="event.stopPropagation();resubmit(${m.sequenceNumber})">Resubmit</button>` : ""}
+            ${isDead
+                ? `<button class="act resubmit" onclick="event.stopPropagation();resubmit(${m.sequenceNumber})">Resubmit</button>`
+                : `<button class="act delete" onclick="event.stopPropagation();deadLetter(${m.sequenceNumber})">Dead-letter</button>`}
             <button class="act delete" onclick="event.stopPropagation();del('${kind}', ${m.sequenceNumber})">Delete</button>
           </td>
         </tr>`).join("");
@@ -718,7 +783,7 @@
         foot.innerHTML =
             (kind === "deadLetter"
                 ? `<button class="act resubmit" onclick="closeModal();resubmit(${m.sequenceNumber})">Resubmit</button>`
-                : "") +
+                : `<button class="act delete" onclick="closeModal();deadLetter(${m.sequenceNumber})">Dead-letter</button>`) +
             `<button class="act delete" onclick="closeModal();del('${kind}', ${m.sequenceNumber})">Delete</button>`;
 
         document.getElementById("overlay").classList.add("open");
@@ -732,26 +797,32 @@
         if (e.key === "Escape") {
             closeModal();
             closeSettings();
+            closeCompose();
         }
     });
 
-    async function action(url, method, okMsg) {
-        if (busy) return;
+    async function action(url, method, okMsg, body) {
+        if (busy) return false;
         if (!hasSettings()) {
             openSettings();
-            return;
+            return false;
         }
         busy = true;
         try {
-            const res = await fetch(url, {method, headers: sbHeaders()});
+            const opts = body !== undefined
+                ? {method, headers: sbHeaders({"Content-Type": "application/json"}), body: JSON.stringify(body)}
+                : {method, headers: sbHeaders()};
+            const res = await fetch(url, opts);
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.detail || err.message || "Request failed.");
             }
             toast(okMsg);
             await load();
+            return true;
         } catch (e) {
             toast(e.message, true);
+            return false;
         } finally {
             busy = false;
         }
@@ -760,6 +831,12 @@
     function resubmit(seq) {
         if (!confirm("Resubmit this message back onto the active queue and remove it from the dead-letter queue?")) return;
         action(`/api/deadletter/${seq}/resubmit`, "POST", "Message resubmitted.");
+    }
+
+    function deadLetter(seq) {
+        if (!confirm("Move this message to the dead-letter queue?")) return;
+        const reason = prompt("Dead-letter reason (optional):") || null;
+        action(`/api/active/${seq}/deadletter`, "POST", "Message moved to dead-letter queue.", {reason});
     }
 
     function del(kind, seq) {
