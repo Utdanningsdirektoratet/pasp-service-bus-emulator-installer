@@ -4,7 +4,7 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile
-    image: udir/servicebus-explorer:1.2.3
+    image: udir/servicebus-explorer:1.2.4
     container_name: servicebus-explorer
     restart: unless-stopped
     ports:
@@ -12,3 +12,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_HTTP_PORTS: "9010"
+    networks:
+      - udir_default
+
+networks:
+  udir_default:
+    external: true

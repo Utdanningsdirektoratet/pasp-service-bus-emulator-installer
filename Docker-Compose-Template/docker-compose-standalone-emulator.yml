@@ -6,6 +6,7 @@ services:
   emulator:
     container_name: "servicebus-emulator"
     image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+    restart: unless-stopped
     pull_policy: always
     volumes:
       - "${CONFIG_PATH}:/ServiceBus_Emulator/ConfigFiles/Config.json"
@@ -16,3 +17,9 @@ services:
       SQL_SERVER: host.docker.internal:1433 # Host:Port for user speficied SQL DB container (Port is optional if default 1433 is used)
       MSSQL_SA_PASSWORD: "${SQL_PASSWORD}" # Password for user specified SQL instance
       ACCEPT_EULA: ${ACCEPT_EULA}
+    networks:
+      - udir_default
+
+networks:
+  udir_default:
+    external: true
